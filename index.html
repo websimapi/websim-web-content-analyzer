@@ -3,314 +3,1240 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Text & URL Summarizer</title>
+    <title>Web Content Analyzer & Summarizer</title>
+    <script type="importmap">
+        {
+            "imports": {
+                "marked": "https://cdn.jsdelivr.net/npm/marked@7.0.5/lib/marked.esm.js",
+                "dompurify": "https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.es.js"
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            color: #333;
+        :root {
+            --primary: #4361ee;
+            --primary-light: #4895ef;
+            --secondary: #3f37c9;
+            --accent: #f72585;
+            --bg-light: #f8f9fa;
+            --bg-dark: #212529;
+            --text-light: #212529;
+            --text-dark: #f8f9fa;
+            --success: #2ecc71;
+            --warning: #f39c12;
+            --danger: #e74c3c;
+            --info: #3498db;
+            --border-radius: 8px;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --transition: all 0.3s ease;
         }
-        h1 {
-            text-align: center;
-            color: #2c3e50;
-            margin-bottom: 30px;
-        }
-        .input-container {
-            margin-bottom: 20px;
-        }
-        textarea {
-            width: 100%;
-            min-height: 120px;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            resize: vertical;
-            font-family: inherit;
+
+        * {
+            margin: 0;
+            padding: 0;
             box-sizing: border-box;
         }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-light);
+            line-height: 1.6;
+            padding: 0;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            margin-bottom: 2rem;
+            border-radius: 0 0 var(--border-radius) var(--border-radius);
+            box-shadow: var(--shadow);
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+        }
+
+        .input-section {
+            background-color: white;
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 2rem;
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        input[type="url"], textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+
+        input[type="url"]:focus, textarea:focus {
+            border-color: var(--primary);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.3);
+        }
+
+        textarea {
+            min-height: 150px;
+            resize: vertical;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
         button {
-            background-color: #3498db;
+            padding: 12px 24px;
+            background-color: var(--primary);
             color: white;
             border: none;
-            padding: 12px 20px;
-            border-radius: 4px;
+            border-radius: var(--border-radius);
             cursor: pointer;
-            font-size: 16px;
-            transition: background-color 0.3s;
-            display: block;
-            margin: 0 auto;
+            font-weight: 600;
+            transition: var(--transition);
+            flex: 1;
+            min-width: 120px;
         }
+
         button:hover {
-            background-color: #2980b9;
+            background-color: var(--secondary);
+            transform: translateY(-2px);
         }
-        button:disabled {
-            background-color: #95a5a6;
-            cursor: not-allowed;
+
+        button:active {
+            transform: translateY(0);
         }
-        .summary-container {
-            margin-top: 30px;
-            border-top: 1px solid #eee;
-            padding-top: 20px;
-            display: none;
+
+        button.btn-secondary {
+            background-color: #6c757d;
         }
-        .summary-container.visible {
-            display: block;
+
+        button.btn-secondary:hover {
+            background-color: #5a6268;
         }
-        .summary-content ul {
-            padding-left: 20px;
-        }
-        .summary-content li {
-            margin-bottom: 10px;
-        }
-        .loader {
+
+        .loading {
             display: none;
             text-align: center;
-            margin: 20px 0;
+            margin: 2rem 0;
         }
-        .loader.visible {
-            display: block;
-        }
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
+
+        .loading-spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: var(--primary);
             border-radius: 50%;
-            width: 30px;
-            height: 30px;
+            width: 40px;
+            height: 40px;
             animation: spin 1s linear infinite;
-            margin: 0 auto;
+            margin: 0 auto 1rem;
         }
+
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            to { transform: rotate(360deg); }
         }
-        .error {
-            background-color: #ffecec;
-            color: #e74c3c;
-            padding: 15px;
-            border-radius: 4px;
-            margin: 20px 0;
+
+        .result-section {
+            display: none;
+            background-color: white;
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 2rem;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid #ddd;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            font-weight: 600;
+            transition: var(--transition);
+            white-space: nowrap;
+        }
+
+        .tab.active {
+            border-bottom-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .tab-content {
             display: none;
         }
-        .error.visible {
+
+        .tab-content.active {
             display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .analysis-section {
+            margin-bottom: 2rem;
+        }
+
+        .analysis-section h3 {
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .analysis-item {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 1rem;
+            border-left: 4px solid var(--primary);
+            transition: var(--transition);
+        }
+
+        .analysis-item:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        .keyword-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 1rem;
+        }
+
+        .keyword-tag {
+            background-color: var(--primary-light);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 50px;
+            font-size: 0.85rem;
+        }
+
+        .content-tree {
+            margin-top: 1rem;
+        }
+
+        .tree-item {
+            padding: 8px 0;
+            padding-left: 20px;
+            border-left: 1px solid #ddd;
+            margin-left: 20px;
+        }
+
+        .tree-item-header {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+
+        .tree-item-header:before {
+            content: '▶';
+            display: inline-block;
+            margin-right: 10px;
+            transition: transform 0.3s ease;
+            font-size: 10px;
+        }
+
+        .tree-item.expanded > .tree-item-header:before {
+            transform: rotate(90deg);
+        }
+
+        .tree-item-content {
+            display: none;
+            padding-left: 20px;
+            margin-top: 8px;
+        }
+
+        .tree-item.expanded > .tree-item-content {
+            display: block;
+        }
+
+        .source-code {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            overflow-x: auto;
+            white-space: pre-wrap;
+            font-family: monospace;
+            margin-bottom: 1rem;
+        }
+
+        .collapsible {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 1rem;
+            cursor: pointer;
+        }
+
+        .collapsible-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+        }
+
+        .collapsible-content {
+            display: none;
+            padding-top: 1rem;
+            border-top: 1px solid #ddd;
+            margin-top: 1rem;
+        }
+
+        .collapsible.active .collapsible-content {
+            display: block;
+        }
+
+        .collapsible-icon {
+            transition: transform 0.3s ease;
+        }
+
+        .collapsible.active .collapsible-icon {
+            transform: rotate(180deg);
+        }
+
+        .visual-element {
+            margin-top: 2rem;
+            text-align: center;
+        }
+
+        .chart-container {
+            height: 300px;
+            margin-bottom: 2rem;
+        }
+
+        .info-card {
+            background-color: #e3f2fd;
+            border-left: 4px solid var(--info);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: var(--border-radius);
+        }
+
+        .warning-card {
+            background-color: #fff3e0;
+            border-left: 4px solid var(--warning);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: var(--border-radius);
+        }
+
+        .error-card {
+            background-color: #ffebee;
+            border-left: 4px solid var(--danger);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: var(--border-radius);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 50px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        .badge-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .badge-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .badge-success {
+            background-color: var(--success);
+            color: white;
+        }
+
+        .badge-warning {
+            background-color: var(--warning);
+            color: white;
+        }
+
+        .sentiment-meter {
+            height: 20px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+
+        .sentiment-value {
+            height: 100%;
+            background: linear-gradient(to right, var(--danger), var(--warning), var(--success));
+        }
+
+        .sentiment-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+
+        @media (max-width: 768px) {
+            .btn-group {
+                flex-direction: column;
+            }
+
+            button {
+                width: 100%;
+            }
+
+            .tabs {
+                flex-wrap: nowrap;
+            }
+
+            .tab {
+                flex: 1;
+                text-align: center;
+                padding: 10px 12px;
+                font-size: 0.9rem;
+            }
+        }
+
+        .topic-bubble {
+            display: inline-block;
+            background-color: var(--primary-light);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            margin: 5px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .topic-bubble:hover {
+            transform: scale(1.05);
+            background-color: var(--primary);
+        }
+        
+        .topic-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 1rem 0;
+        }
+
+        .metadata-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .metadata-item {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        
+        .metadata-item h4 {
+            margin-bottom: 0.5rem;
+            color: var(--primary);
+        }
+
+        .content-preview {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            margin: 1rem 0;
+            background-color: white;
+        }
+
+        .insights-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        
+        .insights-list li {
+            position: relative;
+            padding-left: 1.5rem;
+            margin-bottom: 0.8rem;
+        }
+        
+        .insights-list li:before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
-    <h1>Text & URL Summarizer</h1>
-    
-    <div class="input-container">
-        <p>Paste text OR a URL below:</p>
-        <textarea id="input-text" placeholder="Enter a URL or paste text to summarize"></textarea>
+    <header>
+        <h1>Web Content Analyzer & Summarizer</h1>
+        <p>Enter a URL or paste text to get an interactive, comprehensive analysis</p>
+    </header>
+
+    <div class="container">
+        <div class="input-section">
+            <div class="input-group">
+                <label for="url-input">Enter a URL:</label>
+                <input type="url" id="url-input" placeholder="https://example.com" />
+            </div>
+
+            <div class="input-group">
+                <label for="text-input">Or paste text to analyze:</label>
+                <textarea id="text-input" placeholder="Paste your text here..."></textarea>
+            </div>
+
+            <div class="input-group">
+                <label for="analysis-type">Analysis Focus:</label>
+                <div class="btn-group" id="analysis-type">
+                    <button class="analysis-option active" data-type="comprehensive">Comprehensive</button>
+                    <button class="analysis-option" data-type="summary">Summary</button>
+                    <button class="analysis-option" data-type="key-points">Key Points</button>
+                    <button class="analysis-option" data-type="structure">Page Structure</button>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button id="analyze-btn">Analyze Content</button>
+                <button id="clear-btn" class="btn-secondary">Clear</button>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="loading-spinner"></div>
+            <p>Analyzing content, please wait...</p>
+        </div>
+
+        <div class="result-section" id="result-section">
+            <div class="tabs" id="result-tabs">
+                <div class="tab active" data-tab="summary">Summary</div>
+                <div class="tab" data-tab="key-points">Key Points</div>
+                <div class="tab" data-tab="topics">Topics & Insights</div>
+                <div class="tab" data-tab="structure">Page Structure</div>
+                <div class="tab" data-tab="metadata">Metadata</div>
+                <div class="tab" data-tab="visual">Visualization</div>
+            </div>
+
+            <div class="tab-content active" id="summary-tab">
+                <div class="analysis-section">
+                    <h3>Executive Summary</h3>
+                    <div id="summary-content"></div>
+                </div>
+
+                <div class="analysis-section">
+                    <h3>Content Overview</h3>
+                    <div id="overview-content"></div>
+                </div>
+
+                <div class="analysis-section">
+                    <h3>Sentiment Analysis</h3>
+                    <div class="sentiment-meter">
+                        <div class="sentiment-value" id="sentiment-value"></div>
+                    </div>
+                    <div class="sentiment-labels">
+                        <span>Negative</span>
+                        <span>Neutral</span>
+                        <span>Positive</span>
+                    </div>
+                    <div id="sentiment-explanation"></div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="key-points-tab">
+                <div class="analysis-section">
+                    <h3>Main Takeaways</h3>
+                    <div id="key-points-list"></div>
+                </div>
+                
+                <div class="analysis-section">
+                    <h3>Supporting Evidence</h3>
+                    <div id="supporting-evidence"></div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="topics-tab">
+                <div class="analysis-section">
+                    <h3>Main Topics</h3>
+                    <div id="topic-container" class="topic-container"></div>
+                </div>
+
+                <div class="analysis-section">
+                    <h3>Key Insights</h3>
+                    <ul id="insights-list" class="insights-list"></ul>
+                </div>
+
+                <div class="analysis-section">
+                    <h3>Related Concepts</h3>
+                    <div id="keyword-list" class="keyword-list"></div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="structure-tab">
+                <div class="analysis-section">
+                    <h3>Content Structure</h3>
+                    <div id="content-tree" class="content-tree"></div>
+                </div>
+
+                <div class="analysis-section">
+                    <h3>Content Preview</h3>
+                    <div id="content-preview" class="content-preview"></div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="metadata-tab">
+                <div class="analysis-section">
+                    <h3>Page Metadata</h3>
+                    <div id="metadata-grid" class="metadata-grid"></div>
+                </div>
+
+                <div class="analysis-section">
+                    <h3>Links Analysis</h3>
+                    <div id="links-analysis"></div>
+                </div>
+
+                <div class="analysis-section">
+                    <h3>Media Analysis</h3>
+                    <div id="media-analysis"></div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="visual-tab">
+                <div class="analysis-section">
+                    <h3>Content Distribution</h3>
+                    <div id="content-distribution-chart" class="chart-container"></div>
+                </div>
+
+                <div class="analysis-section">
+                    <h3>Topic Relationship</h3>
+                    <div id="topic-relationship-chart" class="chart-container"></div>
+                </div>
+            </div>
+        </div>
     </div>
-    
-    <button id="submit-btn">Summarize</button>
-    
-    <div class="loader" id="loader">
-        <div class="spinner"></div>
-        <p>Generating summary...</p>
-    </div>
-    
-    <div class="error" id="error-display"></div>
-    
-    <div class="summary-container" id="summary-container">
-        <h2>Summary</h2>
-        <div class="summary-content" id="summary-content"></div>
-    </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const inputText = document.getElementById('input-text');
-            const submitBtn = document.getElementById('submit-btn');
-            const loader = document.getElementById('loader');
-            const errorDisplay = document.getElementById('error-display');
-            const summaryContainer = document.getElementById('summary-container');
-            const summaryContent = document.getElementById('summary-content');
+    <script type="module">
+        import { marked } from 'marked';
+        import DOMPurify from 'dompurify';
 
-            // List of CORS proxies to try
-            const proxies = [
-                "https://api.allorigins.win/raw?url=",
-                "https://corsproxy.io/?",
-                "https://thingproxy.freeboard.io/fetch/"
-            ];
+        // Element references
+        const urlInput = document.getElementById('url-input');
+        const textInput = document.getElementById('text-input');
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const loadingEl = document.getElementById('loading');
+        const resultSection = document.getElementById('result-section');
+        const resultTabs = document.getElementById('result-tabs');
+        const analysisOptions = document.querySelectorAll('.analysis-option');
 
-            // Helper to show/hide UI elements
-            const toggleElement = (element, visible) => {
-                element.classList.toggle('visible', visible);
-            };
+        // Tab switching functionality
+        resultTabs.addEventListener('click', (e) => {
+            if (e.target.classList.contains('tab')) {
+                const tabId = e.target.getAttribute('data-tab');
+                
+                // Update active tab
+                document.querySelectorAll('.tab').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                e.target.classList.add('active');
+                
+                // Show corresponding tab content
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                document.getElementById(`${tabId}-tab`).classList.add('active');
+            }
+        });
 
-            // Display error message
-            const showError = (message) => {
-                errorDisplay.textContent = message;
-                toggleElement(errorDisplay, true);
-                toggleElement(loader, false);
-                submitBtn.disabled = false;
-            };
+        // Analysis type selection
+        analysisOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                analysisOptions.forEach(opt => opt.classList.remove('active'));
+                option.classList.add('active');
+            });
+        });
 
-            // Check if input is a URL
-            const isURL = (text) => {
-                try {
-                    new URL(text);
-                    return true;
-                } catch {
-                    return false;
-                }
-            };
+        // Clear button functionality
+        clearBtn.addEventListener('click', () => {
+            urlInput.value = '';
+            textInput.value = '';
+            resultSection.style.display = 'none';
+        });
 
-            // Extract main content from HTML
-            const extractMainContent = (html) => {
-                try {
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-                    
-                    // Remove scripts, styles, and other non-content elements
-                    const elementsToRemove = doc.querySelectorAll('script, style, nav, header, footer, aside, iframe, noscript');
-                    elementsToRemove.forEach(el => el.remove());
-                    
-                    // Try to find main content container
-                    const mainContent = doc.querySelector('main, article, .content, .main, #content, #main');
-                    
-                    if (mainContent) {
-                        return mainContent.textContent.trim();
-                    }
-                    
-                    // Fallback to body content if no main container found
-                    return doc.body.textContent.trim();
-                } catch (error) {
-                    console.error('Error extracting content:', error);
-                    return html; // Return the raw HTML if extraction fails
-                }
-            };
-
-            // Fetch URL content with CORS proxy fallbacks
-            const fetchWithProxies = async (url) => {
-                for (let proxy of proxies) {
+        // Analyze button functionality
+        analyzeBtn.addEventListener('click', async () => {
+            const url = urlInput.value.trim();
+            const text = textInput.value.trim();
+            
+            if (!url && !text) {
+                alert('Please enter a URL or paste text to analyze');
+                return;
+            }
+            
+            // Get selected analysis type
+            const selectedAnalysisType = document.querySelector('.analysis-option.active').getAttribute('data-type');
+            
+            // Show loading state
+            loadingEl.style.display = 'block';
+            resultSection.style.display = 'none';
+            
+            try {
+                let content = text;
+                let pageMetadata = {};
+                
+                // Fetch URL content if URL is provided
+                if (url) {
                     try {
-                        const proxyUrl = proxy + encodeURIComponent(url);
-                        console.log(`Trying proxy: ${proxy}`);
-                        
-                        const response = await fetch(proxyUrl);
-                        if (!response.ok) throw new Error(`Failed with proxy ${proxy}`);
-                        
-                        const html = await response.text();
-                        console.log('Successfully fetched content');
-                        return extractMainContent(html);
-                    } catch (err) {
-                        console.error(`Proxy failed: ${proxy}`, err);
-                        // Continue to next proxy
+                        const response = await fetchUrlContent(url);
+                        content = response.content;
+                        pageMetadata = response.metadata;
+                    } catch (error) {
+                        throw new Error(`Failed to fetch URL content: ${error.message}`);
                     }
                 }
                 
-                // If all proxies fail
-                throw new Error("Could not fetch URL content. CORS or network issue.");
-            };
+                // Process the content with AI
+                const analysisResult = await analyzeContent(content, selectedAnalysisType, pageMetadata);
+                
+                // Display results
+                displayResults(analysisResult, pageMetadata);
+                
+                // Hide loading, show results
+                loadingEl.style.display = 'none';
+                resultSection.style.display = 'block';
+                
+                // Save to database
+                saveAnalysisToDatabase(url || 'Text Input', analysisResult);
+                
+            } catch (error) {
+                loadingEl.style.display = 'none';
+                alert(`Analysis failed: ${error.message}`);
+            }
+        });
 
-            // Summarize text using WebSim's LLM capabilities
-            const summarizeText = async (text) => {
-                try {
-                    const completion = await websim.chat.completions.create({
-                        messages: [
-                            {
-                                role: "system",
-                                content: "You are a helpful assistant that creates concise bullet-point summaries. Extract the key points and organize them logically."
-                            },
-                            {
-                                role: "user",
-                                content: `Summarize the following text into 5-8 clear bullet points that capture the main ideas:\n\n${text}`
-                            }
-                        ]
-                    });
+        // Fetch URL content with proxy service
+        async function fetchUrlContent(url) {
+            try {
+                const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+                const response = await fetch(proxyUrl);
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
+                }
+                
+                const html = await response.text();
+                
+                // Create a DOM parser to extract content and metadata
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                
+                // Extract metadata
+                const metadata = {
+                    title: doc.title || '',
+                    description: doc.querySelector('meta[name="description"]')?.getAttribute('content') || '',
+                    keywords: doc.querySelector('meta[name="keywords"]')?.getAttribute('content') || '',
+                    author: doc.querySelector('meta[name="author"]')?.getAttribute('content') || '',
+                    ogTitle: doc.querySelector('meta[property="og:title"]')?.getAttribute('content') || '',
+                    ogDescription: doc.querySelector('meta[property="og:description"]')?.getAttribute('content') || '',
+                    ogImage: doc.querySelector('meta[property="og:image"]')?.getAttribute('content') || '',
+                    twitterTitle: doc.querySelector('meta[name="twitter:title"]')?.getAttribute('content') || '',
+                    twitterDescription: doc.querySelector('meta[name="twitter:description"]')?.getAttribute('content') || '',
+                    twitterImage: doc.querySelector('meta[name="twitter:image"]')?.getAttribute('content') || '',
+                    url: url,
+                    links: Array.from(doc.querySelectorAll('a')).map(a => ({
+                        text: a.textContent.trim(),
+                        href: a.href
+                    })).filter(link => link.text && link.href),
+                    images: Array.from(doc.querySelectorAll('img')).map(img => ({
+                        alt: img.alt,
+                        src: img.src
+                    })).filter(img => img.src),
+                    headings: Array.from(doc.querySelectorAll('h1, h2, h3, h4, h5, h6')).map(h => ({
+                        level: parseInt(h.tagName.substring(1)),
+                        text: h.textContent.trim()
+                    })).filter(h => h.text)
+                };
+                
+                // Get main content, removing scripts, styles and other non-content elements
+                const bodyClone = doc.body.cloneNode(true);
+                Array.from(bodyClone.querySelectorAll('script, style, noscript, iframe, svg, nav, footer, header')).forEach(el => el.remove());
+                
+                const mainContent = bodyClone.textContent.trim()
+                    .replace(/\s+/g, ' ')
+                    .replace(/\n+/g, '\n');
+                
+                return {
+                    content: mainContent,
+                    rawHtml: html,
+                    metadata: metadata
+                };
+            } catch (error) {
+                console.error('Error fetching URL:', error);
+                throw error;
+            }
+        }
+
+        // Analyze content using AI
+        async function analyzeContent(content, analysisType, metadata = {}) {
+            try {
+                // Limit content length to avoid token limits
+                const truncatedContent = content.substring(0, 15000);
+                
+                // Build prompt based on analysis type
+                let systemPrompt = '';
+                
+                switch (analysisType) {
+                    case 'comprehensive':
+                        systemPrompt = `You are an expert content analyzer. Analyze the following web content comprehensively and provide a detailed analysis in JSON format. Include: 
+                        1. A concise executive summary (2-3 paragraphs)
+                        2. Content overview
+                        3. Main takeaways as bullet points (minimum 5)
+                        4. Supporting evidence for each takeaway
+                        5. Main topics (3-7) with brief descriptions
+                        6. Key insights (5-10)
+                        7. Related keywords/concepts (10-15)
+                        8. Content structure analysis
+                        9. Sentiment analysis (score from -1 to 1 and explanation)
+                        
+                        Output in the following JSON structure:
+                        {
+                            "executive_summary": "string",
+                            "content_overview": "string",
+                            "main_takeaways": [{"point": "string", "explanation": "string"}],
+                            "topics": [{"name": "string", "description": "string"}],
+                            "key_insights": ["string"],
+                            "related_concepts": ["string"],
+                            "content_structure": {"sections": [{"title": "string", "level": "number", "summary": "string"}]},
+                            "sentiment": {"score": "number", "explanation": "string"}
+                        }`;
+                        break;
                     
-                    return completion.content;
+                    case 'summary':
+                        systemPrompt = `You are an expert summarizer. Create a concise yet comprehensive summary of the provided web content. Include:
+                        1. An executive summary (2-3 paragraphs)
+                        2. The main point or purpose of the content
+                        3. Sentiment analysis (score from -1 to 1 and explanation)
+                        
+                        Output in the following JSON structure:
+                        {
+                            "executive_summary": "string",
+                            "main_point": "string",
+                            "sentiment": {"score": "number", "explanation": "string"}
+                        }`;
+                        break;
+                    
+                    case 'key-points':
+                        systemPrompt = `You are an expert content analyzer. Extract the key points from the provided web content. Include:
+                        1. Main takeaways as bullet points (minimum 8)
+                        2. Supporting evidence for each takeaway
+                        3. Related keywords/concepts (10-15)
+                        
+                        Output in the following JSON structure:
+                        {
+                            "main_takeaways": [{"point": "string", "explanation": "string"}],
+                            "related_concepts": ["string"]
+                        }`;
+                        break;
+                    
+                    case 'structure':
+                        systemPrompt = `You are an expert content analyzer. Analyze the structure of the provided web content. Include:
+                        1. Content structure with sections and subsections
+                        2. Main topics (3-7) covered
+                        3. A high-level overview of the content organization
+                        
+                        Output in the following JSON structure:
+                        {
+                            "content_structure": {"sections": [{"title": "string", "level": "number", "summary": "string"}]},
+                            "topics": [{"name": "string", "description": "string"}],
+                            "overview": "string"
+                        }`;
+                        break;
+                }
+                
+                // Add metadata to the prompt if available
+                let metadataPrompt = '';
+                if (metadata.title) {
+                    metadataPrompt += `Page Title: ${metadata.title}\n`;
+                }
+                if (metadata.description) {
+                    metadataPrompt += `Meta Description: ${metadata.description}\n`;
+                }
+                if (metadata.headings && metadata.headings.length > 0) {
+                    metadataPrompt += 'Main Headings:\n';
+                    metadata.headings.slice(0, 10).forEach(h => {
+                        metadataPrompt += `${h.level === 1 ? '#' : h.level === 2 ? '##' : '###'} ${h.text}\n`;
+                    });
+                }
+                
+                // Call the AI model with the content
+                const completion = await websim.chat.completions.create({
+                    messages: [
+                        {
+                            role: "system",
+                            content: systemPrompt
+                        },
+                        {
+                            role: "user",
+                            content: `${metadataPrompt}\n\nAnalyze the following content:\n\n${truncatedContent}`
+                        }
+                    ],
+                    json: true
+                });
+                
+                // Parse the result as JSON
+                try {
+                    return JSON.parse(completion.content);
                 } catch (error) {
-                    console.error('Summarization error:', error);
-                    throw new Error("Failed to generate summary. The AI service may be temporarily unavailable.");
+                    console.error('Error parsing AI response:', error);
+                    return {
+                        error: 'Failed to parse analysis results',
+                        raw_response: completion.content
+                    };
                 }
-            };
+            } catch (error) {
+                console.error('Error analyzing content:', error);
+                throw error;
+            }
+        }
 
-            // Format the summary as HTML bullet points
-            const formatSummary = (summaryText) => {
-                // Split by lines that start with a bullet point marker (-, *, •)
-                const points = summaryText.split(/\n+/).filter(line => 
-                    line.trim().match(/^[-•*]\s+/) || line.trim().length > 10
-                );
-                
-                if (points.length === 0) {
-                    return `<p>${summaryText}</p>`;
-                }
-                
-                const listItems = points.map(point => {
-                    // Remove bullet point markers and trim
-                    const cleanPoint = point.trim().replace(/^[-•*]\s+/, '');
-                    return `<li>${cleanPoint}</li>`;
+        // Display the analysis results in the UI
+        function displayResults(results, metadata = {}) {
+            // Helper function to render markdown safely
+            const renderMarkdown = (text) => {
+                if (!text) return '';
+                return DOMPurify.sanitize(marked.parse(text));
+            };
+            
+            // Render Summary tab
+            if (results.executive_summary) {
+                document.getElementById('summary-content').innerHTML = renderMarkdown(results.executive_summary);
+            }
+            
+            if (results.content_overview || results.overview || results.main_point) {
+                document.getElementById('overview-content').innerHTML = renderMarkdown(results.content_overview || results.overview || results.main_point);
+            }
+            
+            // Render sentiment analysis if available
+            if (results.sentiment && typeof results.sentiment.score === 'number') {
+                const sentimentScore = results.sentiment.score;
+                const normalizedScore = ((sentimentScore + 1) / 2) * 100; // Convert from -1,1 to 0,100
+                document.getElementById('sentiment-value').style.width = `${normalizedScore}%`;
+                document.getElementById('sentiment-explanation').innerHTML = renderMarkdown(results.sentiment.explanation);
+            }
+            
+            // Render Key Points tab
+            if (results.main_takeaways && results.main_takeaways.length > 0) {
+                const keyPointsHTML = results.main_takeaways.map((item, index) => {
+                    return `
+                        <div class="analysis-item">
+                            <h4>${index + 1}. ${item.point}</h4>
+                            <p>${item.explanation}</p>
+                        </div>
+                    `;
                 }).join('');
                 
-                return `<ul>${listItems}</ul>`;
-            };
-
-            // Main summarization process
-            const processSummarization = async () => {
-                const text = inputText.value.trim();
+                document.getElementById('key-points-list').innerHTML = keyPointsHTML;
                 
-                if (!text) {
-                    showError("Please enter a URL or text to summarize.");
-                    return;
-                }
-                
-                // Reset UI
-                toggleElement(errorDisplay, false);
-                toggleElement(summaryContainer, false);
-                toggleElement(loader, true);
-                submitBtn.disabled = true;
-                
-                try {
-                    let contentToSummarize = text;
-                    
-                    // Check if input is a URL
-                    if (isURL(text)) {
-                        try {
-                            contentToSummarize = await fetchWithProxies(text);
-                        } catch (error) {
-                            showError(`Failed to fetch URL content: ${error.message}`);
-                            return;
-                        }
-                    }
-                    
-                    // Truncate if content is too long (LLM context limit)
-                    if (contentToSummarize.length > 12000) {
-                        contentToSummarize = contentToSummarize.substring(0, 12000) + 
-                            "... (content truncated due to length)";
-                    }
-                    
-                    // Generate summary
-                    const summary = await summarizeText(contentToSummarize);
-                    
-                    // Display summary
-                    summaryContent.innerHTML = formatSummary(summary);
-                    toggleElement(summaryContainer, true);
-                    toggleElement(loader, false);
-                    submitBtn.disabled = false;
-                    
-                } catch (error) {
-                    showError(`Summarization failed: ${error.message}`);
-                }
-            };
-
-            // Event listener for submit button
-            submitBtn.addEventListener('click', processSummarization);
+                // If supporting evidence isn't explicitly provided, use the explanations
+                const evidenceHTML = results.supporting_evidence || 
+                    `<p>Supporting evidence is included with each key point above.</p>`;
+                document.getElementById('supporting-evidence').innerHTML = evidenceHTML;
+            }
             
-            // Allow Enter key in textarea to submit (with Ctrl/Cmd)
-            inputText.addEventListener('keydown', (e) => {
-                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                    processSummarization();
+            // Render Topics tab
+            if (results.topics && results.topics.length > 0) {
+                const topicsHTML = results.topics.map(topic => {
+                    return `<div class="topic-bubble" title="${topic.description}">${topic.name}</div>`;
+                }).join('');
+                
+                document.getElementById('topic-container').innerHTML = topicsHTML;
+            }
+            
+            // Render insights if available
+            if (results.key_insights && results.key_insights.length > 0) {
+                const insightsHTML = results.key_insights.map(insight => {
+                    return `<li>${insight}</li>`;
+                }).join('');
+                
+                document.getElementById('insights-list').innerHTML = insightsHTML;
+            }
+            
+            // Render related concepts/keywords
+            if (results.related_concepts && results.related_concepts.length > 0) {
+                const keywordsHTML = results.related_concepts.map(keyword => {
+                    return `<span class="keyword-tag">${keyword}</span>`;
+                }).join('');
+                
+                document.getElementById('keyword-list').innerHTML = keywordsHTML;
+            }
+            
+            // Render Structure tab
+            if (results.content_structure && results.content_structure.sections) {
+                const generateTreeHTML = (sections, level = 0) => {
+                    return sections.map(section => {
+                        const indentClass = level > 0 ? 'tree-item' : '';
+                        return `
+                            <div class="${indentClass}">
+                                <div class="tree-item-header" onclick="this.parentElement.classList.toggle('expanded')">
+                                    <span>${section.title}</span>
+                                </div>
+                                <div class="tree-item-content">
+                                    <p>${section.summary || 'No summary available'}</p>
+                                    ${section.subsections ? generateTreeHTML(section.subsections, level + 1) : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                };
+                
+                document.getElementById('content-tree').innerHTML = generateTreeHTML(results.content_structure.sections);
+                
+                // Add content preview if available
+                if (metadata.title) {
+                    let previewHTML = `<h2>${metadata.title}</h2>`;
+                    if (metadata.description) {
+                        previewHTML += `<p><em>${metadata.description}</em></p>`;
+                    }
+                    
+                    if (metadata.headings && metadata.headings.length > 0) {
+                        previewHTML += '<div class="structure-preview">';
+                        metadata.headings.forEach(h => {
+                            const headingLevel = Math.min(h.level, 6);
+                            previewHTML += `<h${headingLevel} style="margin-left: ${(headingLevel-1) * 15}px">${h.text}</h${headingLevel}>`;
+                        });
+                        previewHTML += '</div>';
+                    }
+                    
+                    document.getElementById('content-preview').innerHTML = previewHTML;
                 }
-            });
+            }
+            
+            // Render Metadata tab
+            if (metadata) {
+                let metadataHTML = '';
+                
+                // Basic metadata
+                if (metadata.title) {
+                    metadataHTML += `
+                        <div class="metadata-item">
+                            <h4>Title</h4>
+                            <p>${metadata.title}</p>
+                        </div>
+                    `;
+                }
+                
+                if (metadata.description) {
+                    metadataHTML += `
+                        <div class="metadata-item">
+                            <h4>Description</h4>
+                            <p>${metadata.description}</p>
+                        </div>
+                    `;
+                }
+                
+                if (metadata.keywords) {
+                    metadataHTML += `
+                        <div class="metadata-item">
+                            <h4>Keywords</h4>
+                            <p>${metadata.keywords}</p>
+                        </div>
+                    `;
+                }
+                
+                if (metadata.author) {
+                    metadataHTML += `
+                        <div class="metadata-item">
+                            <h4>Author</h4>
+                            <p>${metadata.author}</p>
+                        </div>
+                    `;
+                }
+                
+                if (metadata.url) {
+                    metadataHTML += `
+                        <div class="metadata-item">
+                            <h4>URL</h4>
+                            <p><a href="${metadata.url}" target="_blank">${metadata.url}</a></p>
+                        </div>
+                    `;
+                }
+                
+                // Social media metadata
+                if (metadata.ogTitle || metadata.twitterTitle) {
+                    metadataHTML += `
+                        <div class="metadata-item">
+                            <h4>Social Title</h4>
+                            <p>${metadata.ogTitle || metadata.twitterTitle}</p>
+                        </div>
+                    `;
+                }
+                
+                if (metadata.ogDescription || metadata.twitterDescription) {
+                    metadataHTML += `
+                        <div class="metadata-item">
+                            <h4>Social Description</h4>
+                            <p>${metadata.ogDescription || metadata.twitterDescription}</p>
+                        </div>
+                    `;
+                }
+                
+                if (metadata.ogImage || metadata.twitterImage) {
+                    const imageUrl = metadata.ogImage || metadata.twitterImage;
+                    metadataHTML += `
+                        <div class="metadata-item">
+                            <h4>Social Image</h4>
+                            <p><img src="${imageUrl}" alt="Social share image" style="max-width: 100%; max-height: 150px;"></p>
+                        </div>
+                    `;
+                }
+                
+                document.getElementById('metadata-grid').innerHTML = metadataHTML;
+                
+                // Links analysis
+                if (metadata.links && metadata.links.length > 0) {
+                    let linksHTML = `<p>Total links found: ${metadata.links.length}</p><div class="collapsible">`;
+                    linksHTML += `
+                        <div class="collapsible-header" onclick="this.parentElement.classList.toggle('active')">
+                            <span>View all links</span>
+                            <span class="collapsible-icon">▼</span>
+                        </div>
+                        <div class="collapsible-content">
+                            <ul>
+                    `;
+                    
+                    metadata.links.slice(0, 50).forEach(link => {
+                        linksHTML += `<li><a href="${link.href}" target="_blank">${link.text || link.href}</a></li>`;
+                    });
+                    
+                    if (metadata.links.length > 50) {
+                        linksHTML += `<li>...and ${metadata.links.length - 50} more links</li>`;
+                    }
+                    
+                    linksHTML += `
+                            </ul>
+                        </div>
+                    </div>
+                    `;
+                    
+                    document.getElementById('links-analysis').innerHTML = linksHTML;
+                }
+                
+                // Media analysis
+                if (metadata.images && metadata.images.length > 0) {
+                    let mediaHTML = `<p>Total images found: ${metadata.images.length}</p><div class="collapsible">`;
+                    mediaHTML += `
+                        <div class="collapsible-header" onclick="this.parentElement.classList.toggle('active')">
+                            <span>View all images</span>
+                            <span class="collapsible-icon">▼</span>
+                        </div>
+                        <div class="collapsible-content">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px;">
+                    `;
+                    
+                    metadata.images.slice(0, 20).forEach(img => {
+                        mediaHTML += `
+                            <div style="text-align: center;">
+                                <img src="${img.src}" alt="${img.alt || 'Image'}" style="max-width: 100%; max-height: 100px; object-fit: contain;">
+                                <p style="font-size: 0.8rem; margin-top: 5px;">${img.alt || 'No alt text'}</p>
+                            </div>
+                        `;
+                    });
+                    
+                    if (metadata.images.length > 20) {
+                        mediaHTML += `<div>...and ${metadata.images.length - 20} more images</div>`;
+                    }
+                    
+                    mediaHTML += `
+                            </div>
+                        </div>
+                    </div>
+                    `;
+                    
+                    document.getElementById('media-analysis').innerHTML = mediaHTML;
+                }
+            }
+            
+            // Initialize the visualization tab (if we implement charts later)
+            // For now, we'll just add placeholders
+            document.getElementById('content-distribution-chart').innerHTML = 
+                '<p>Content distribution visualization would appear here. This feature will be implemented soon.</p>';
+            document.getElementById('topic-relationship-chart').innerHTML = 
+                '<p>Topic relationship visualization would appear here. This feature will be implemented soon.</p>';
+        }
+
+        // Save analysis result to database
+        async function saveAnalysisToDatabase(source, results) {
+            try {
+                const room = new WebsimSocket();
+                
+                await room.collection('analysis').create({
+                    source: source,
+                    timestamp: new Date().toISOString(),
+                    results: JSON.stringify(results)
+                });
+                
+                console.log('Analysis saved to database');
+            } catch (error) {
+                console.error('Error saving to database:', error);
+            }
+        }
+
+        // Initialize collapsible elements
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.collapsible-header')) {
+                const collapsible = e.target.closest('.collapsible');
+                collapsible.classList.toggle('active');
+            }
+            
+            // Tree items
+            if (e.target.closest('.tree-item-header')) {
+                const treeItem = e.target.closest('.tree-item');
+                if (treeItem) {
+                    treeItem.classList.toggle('expanded');
+                }
+            }
         });
     </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
-
