@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text & URL Summarizer</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+        .input-container {
+            margin-bottom: 20px;
+        }
+        textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: vertical;
+            font-family: inherit;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+            display: block;
+            margin: 0 auto;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        .summary-container {
+            margin-top: 30px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+            display: none;
+        }
+        .summary-container.visible {
+            display: block;
+        }
+        .summary-content ul {
+            padding-left: 20px;
+        }
+        .summary-content li {
+            margin-bottom: 10px;
+        }
+        .loader {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .loader.visible {
+            display: block;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .error {
+            background-color: #ffecec;
+            color: #e74c3c;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+            display: none;
+        }
+        .error.visible {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>Text & URL Summarizer</h1>
+    
+    <div class="input-container">
+        <p>Paste text OR a URL below:</p>
+        <textarea id="input-text" placeholder="Enter a URL or paste text to summarize"></textarea>
+    </div>
+    
+    <button id="submit-btn">Summarize</button>
+    
+    <div class="loader" id="loader">
+        <div class="spinner"></div>
+        <p>Generating summary...</p>
+    </div>
+    
+    <div class="error" id="error-display"></div>
+    
+    <div class="summary-container" id="summary-container">
+        <h2>Summary</h2>
+        <div class="summary-content" id="summary-content"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const inputText = document.getElementById('input-text');
+            const submitBtn = document.getElementById('submit-btn');
+            const loader = document.getElementById('loader');
+            const errorDisplay = document.getElementById('error-display');
+            const summaryContainer = document.getElementById('summary-container');
+            const summaryContent = document.getElementById('summary-content');
+
+            // List of CORS proxies to try
+            const proxies = [
+                "https://api.allorigins.win/raw?url=",
+                "https://corsproxy.io/?",
+                "https://thingproxy.freeboard.io/fetch/"
+            ];
+
+            // Helper to show/hide UI elements
+            const toggleElement = (element, visible) => {
+                element.classList.toggle('visible', visible);
+            };
+
+            // Display error message
+            const showError = (message) => {
+                errorDisplay.textContent = message;
+                toggleElement(errorDisplay, true);
+                toggleElement(loader, false);
+                submitBtn.disabled = false;
+            };
+
+            // Check if input is a URL
+            const isURL = (text) => {
+                try {
+                    new URL(text);
+                    return true;
+                } catch {
+                    return false;
+                }
+            };
+
+            // Extract main content from HTML
+            const extractMainContent = (html) => {
+                try {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    
+                    // Remove scripts, styles, and other non-content elements
+                    const elementsToRemove = doc.querySelectorAll('script, style, nav, header, footer, aside, iframe, noscript');
+                    elementsToRemove.forEach(el => el.remove());
+                    
+                    // Try to find main content container
+                    const mainContent = doc.querySelector('main, article, .content, .main, #content, #main');
+                    
+                    if (mainContent) {
+                        return mainContent.textContent.trim();
+                    }
+                    
+                    // Fallback to body content if no main container found
+                    return doc.body.textContent.trim();
+                } catch (error) {
+                    console.error('Error extracting content:', error);
+                    return html; // Return the raw HTML if extraction fails
+                }
+            };
+
+            // Fetch URL content with CORS proxy fallbacks
+            const fetchWithProxies = async (url) => {
+                for (let proxy of proxies) {
+                    try {
+                        const proxyUrl = proxy + encodeURIComponent(url);
+                        console.log(`Trying proxy: ${proxy}`);
+                        
+                        const response = await fetch(proxyUrl);
+                        if (!response.ok) throw new Error(`Failed with proxy ${proxy}`);
+                        
+                        const html = await response.text();
+                        console.log('Successfully fetched content');
+                        return extractMainContent(html);
+                    } catch (err) {
+                        console.error(`Proxy failed: ${proxy}`, err);
+                        // Continue to next proxy
+                    }
+                }
+                
+                // If all proxies fail
+                throw new Error("Could not fetch URL content. CORS or network issue.");
+            };
+
+            // Summarize text using WebSim's LLM capabilities
+            const summarizeText = async (text) => {
+                try {
+                    const completion = await websim.chat.completions.create({
+                        messages: [
+                            {
+                                role: "system",
+                                content: "You are a helpful assistant that creates concise bullet-point summaries. Extract the key points and organize them logically."
+                            },
+                            {
+                                role: "user",
+                                content: `Summarize the following text into 5-8 clear bullet points that capture the main ideas:\n\n${text}`
+                            }
+                        ]
+                    });
+                    
+                    return completion.content;
+                } catch (error) {
+                    console.error('Summarization error:', error);
+                    throw new Error("Failed to generate summary. The AI service may be temporarily unavailable.");
+                }
+            };
+
+            // Format the summary as HTML bullet points
+            const formatSummary = (summaryText) => {
+                // Split by lines that start with a bullet point marker (-, *, •)
+                const points = summaryText.split(/\n+/).filter(line => 
+                    line.trim().match(/^[-•*]\s+/) || line.trim().length > 10
+                );
+                
+                if (points.length === 0) {
+                    return `<p>${summaryText}</p>`;
+                }
+                
+                const listItems = points.map(point => {
+                    // Remove bullet point markers and trim
+                    const cleanPoint = point.trim().replace(/^[-•*]\s+/, '');
+                    return `<li>${cleanPoint}</li>`;
+                }).join('');
+                
+                return `<ul>${listItems}</ul>`;
+            };
+
+            // Main summarization process
+            const processSummarization = async () => {
+                const text = inputText.value.trim();
+                
+                if (!text) {
+                    showError("Please enter a URL or text to summarize.");
+                    return;
+                }
+                
+                // Reset UI
+                toggleElement(errorDisplay, false);
+                toggleElement(summaryContainer, false);
+                toggleElement(loader, true);
+                submitBtn.disabled = true;
+                
+                try {
+                    let contentToSummarize = text;
+                    
+                    // Check if input is a URL
+                    if (isURL(text)) {
+                        try {
+                            contentToSummarize = await fetchWithProxies(text);
+                        } catch (error) {
+                            showError(`Failed to fetch URL content: ${error.message}`);
+                            return;
+                        }
+                    }
+                    
+                    // Truncate if content is too long (LLM context limit)
+                    if (contentToSummarize.length > 12000) {
+                        contentToSummarize = contentToSummarize.substring(0, 12000) + 
+                            "... (content truncated due to length)";
+                    }
+                    
+                    // Generate summary
+                    const summary = await summarizeText(contentToSummarize);
+                    
+                    // Display summary
+                    summaryContent.innerHTML = formatSummary(summary);
+                    toggleElement(summaryContainer, true);
+                    toggleElement(loader, false);
+                    submitBtn.disabled = false;
+                    
+                } catch (error) {
+                    showError(`Summarization failed: ${error.message}`);
+                }
+            };
+
+            // Event listener for submit button
+            submitBtn.addEventListener('click', processSummarization);
+            
+            // Allow Enter key in textarea to submit (with Ctrl/Cmd)
+            inputText.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                    processSummarization();
+                }
+            });
+        });
+    </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
+
